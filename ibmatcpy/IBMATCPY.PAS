@@ -9,7 +9,7 @@ program ibm_at_copy;
    This version is for a BigBoard-II with normal 8" CP/M
    drives on A: and B:, and the 5.25" drive on C: and
    requires the BIOS floppy disk module that recognises
-   the 512 byte/9 sectors per track/80 track format.
+   the 512 byte/15 sectors per track/80 track format.
 
    Author:  Tony Nicholson
 }
