@@ -1,0 +1,332 @@
+;
+; S E T T I M E . M A C
+;
+;  Program to read the date and time from the DS1216
+;  SmartWatch and set the CP/M-Plus system date and time.
+;  Assumes that DS1216 SmartWatch is plugged into the
+;  U81 socket on the Bigboard II
+;
+;  Author:	Tony Nicholson
+;  Date:	17-Jun-1986
+;
+;
+WATCH	equ	47FFh		; SmartWatch address
+SYS1	equ	0C8h		; Memory bank select port
+;
+BDOS	equ	0005h
+$print	equ	9
+$scb	equ	49
+$stime	equ	104
+;
+	aseg
+	org	0100h
+;
+	.z80
+begin:
+	ld	hl,start	; Move clock read routines
+	ld	de,08000H	;  above bank boundary
+	ld	bc,finish-start
+	ldir
+
+	call	rdclk		; Read the SmartWatch
+
+	ld	a,(year)	; Check if time O.K.
+	ld	c,a		;  by making sure that
+	and	0Fh		;  the year value is
+	cp	09h+1		;  a valid BCD value
+	jr	nc,badtime
+	ld	a,c
+	and	0F0h
+	cp	90h+1
+	jr	c,timeok
+
+badtime:
+	ld	c,$print	; Give them the bad news
+	ld	de,badmsg
+	jp	BDOS
+
+badmsg:
+	db	13,10,7,7,7,'Unable to read SmartWatch time.'
+	db	13,10,'Date and Time have not been set.',7,7,7,'$'
+
+timeok:
+	ld	c,85h		; Convert date from BCD
+	ld	hl,dbase	;  into CP/M-Plus date word
+
+nexty:	ld	a,c		; Advance a year
+	add	a,01h
+	daa
+	ld	c,a
+	call	leapck		; Get days in year to DE
+	ld	a,(year)
+	cp	c		; Is this the correct year?
+	jr	z,thisyr	; Yes
+	add	hl,de		; No, add in number of days
+	jr	nexty		;  and check next year
+
+thisyr:	ld	a,(month)	; Convert BCD month to binary
+	call	bcdbin
+	ld	de,mdays
+	ld	b,0
+
+nextm:	dec	a		; Add in days per month
+	jr	z,thismn	; prior to this month
+	push	af
+	ld	a,(de)
+	inc	de
+	ld	c,a
+	pop	af
+	add	hl,bc
+	jr	nextm
+
+thismn:	ld	a,(day)		; Convert day from BCD
+	call	bcdbin		;  to binary
+	ld	c,a
+	add	hl,bc
+	ld	(date),hl	; Save date word
+	ld	hl,(mins)	; Get minutes and hours
+	ld	a,h		; Swap byte order
+	ld	h,l		;  and store hours & minutes
+	ld	l,a		;  for setting
+	ld	(hh),hl
+	ld	c,$stime	; Set CP/M-Plus date and time
+	ld	de,date
+	call	BDOS
+	ld	a,(secs)	; Now set seconds by
+	ld	(ss),a		;  storing into the system
+	ld	c,$scb		;  control block
+	ld	de,scbpb
+	call	BDOS
+
+	ld	a,(wday)	; Get day number
+	dec	a		;  and adjust to range 0..6
+	and	07h
+	ld	l,a		; Multiply it by 3
+	add	a,a
+	add	a,l
+	ld	l,a		; Form address of day name
+	ld	h,0		;  string
+	ld	de,wdays
+	add	hl,de
+	ld	de,DAYTIM	;Copy day name to beginning
+	ld	bc,3		; of date-time string
+	ldir
+	ex	de,hl
+	ld	(hl),' '	;Follow up with a space
+	inc	hl
+	push	hl		;Save pointer to buffer
+	ld	a,(month)	;Get month and
+	call	bcdbin		; calculate address
+	ld	e,a		; of month name into
+	add	a,a		; DE
+	add	a,e
+	ld	e,a
+	ld	d,0
+	ld	hl,mthnam-3
+	add	hl,de
+	ex	de,hl
+	pop	hl		;Restore pointer to buffer
+	ld	a,(day)
+	call	hex		;Convert BCD date to
+	ld	(hl),'-'	; ASCII
+	inc	hl
+	ex	de,hl		;DE is still pointing
+	ld	bc,3		; to the month name
+	ldir
+	ex	de,hl
+	ld	(hl),'-'
+	inc	hl
+	ld	a,(year)
+	call	hex
+	ld	(hl),' '	;Also convert BCD time
+	inc	hl		; to ASCII
+	ld	a,(hours)
+	call	hex
+	ld	(hl),':'
+	inc	hl
+	ld	a,(mins)
+	call	hex
+	ld	(hl),':'
+	inc	hl
+	ld	a,(secs)
+	call	hex
+	ld	(hl),'$'	;String terminator
+
+	ld	c,$print	;Print date and time
+	ld	de,DAYTIM	; and return to CP/M
+	jp	BDOS
+
+hex:	push	af		;Convert binary BCD
+	rrca			; to ASCII decimal digits
+	rrca			; and store in buffer
+	rrca			; pointed to by the HL
+	rrca			; register pair.
+	call	nibble
+	pop	af
+nibble:	and	0Fh
+	add	a,90h
+	daa
+	adc	a,40h
+	daa
+	ld	(hl),a
+	inc	hl
+	ret
+
+bcdbin:	push	bc		; Save BC register
+	ld	c,a		; Copy BCD value to C
+	and	0Fh		; Mask out low digit
+	ld	b,a		;  and save in B
+	ld	a,c		; Now divide high four bits
+	and	0F0h		;  by eight to get 2*high
+	rrca			;  digit.
+	rrca
+	rrca
+	ld	c,a		; Save 2*high digit in C
+	rlca			; *4
+	rlca			; *8
+	add	a,c		; *10
+	add	a,b		; + low digit
+	pop	bc		; All done
+	ret
+
+leapck:	push	hl
+	ld	de,365		;Assume not a leap year
+	ld	a,28
+	ld	(febday),a
+	ld	hl,leaps	;Look up leap year table and
+notlp:	ld	a,(hl)		; adjust days if year found
+	cp	0FFh		;End of table?
+	jr	z,endltb
+	inc	hl
+	cp	c
+	jr	nz,notlp
+	inc	de		;It is a leap year, bump days
+	ld	a,29		; and fixup February in
+	ld	(febday),a	; month table
+endltb:	pop	hl
+	ret
+
+dbase	equ	2922		;Base date of Tue 31-Dec-85
+
+leaps:	db	88h		;Table of leap years
+	db	92h		; (until 2011 should be OK)
+	db	96h
+	db	00h
+	db	04h
+	db	08h
+	db	0ffh		;End of table marker
+
+wdays:	db	'Sun'
+	db	'Mon'
+	db	'Tue'
+	db	'Wed'
+	db	'Thu'
+	db	'Fri'
+	db	'Sat'
+
+mthnam:	db	'Jan'		;Table of abbreviated month names.
+	db	'Feb'
+	db	'Mar'
+	db	'Apr'
+	db	'May'
+	db	'Jun'
+	db	'Jul'
+	db	'Aug'
+	db	'Sep'
+	db	'Oct'
+	db	'Nov'
+	db	'Dec'
+
+mdays:	db	31		;Table of days per month
+febday:	db	28
+	db	31
+	db	30
+	db	31
+	db	30
+	db	31
+	db	31
+	db	30
+	db	31
+	db	30
+	db	31
+
+date:	ds	2		;Number of days since 31-Dec-78
+hh:	ds	1
+mm:	ds	1
+
+scbpb:	db	05Ch		;Offset to seconds
+	db	0FFh		;Set
+ss:	db	00h		;Seconds value in BCD
+
+DAYTIM:
+	DS	23
+
+start:
+;
+	.phase 08000H
+;
+rdclk:
+	ld	(stack),sp	;Save stack pointer
+	ld	sp,stack	;Use local stack
+	di			;No interruptions
+	ld	a,0		;Select EPROM bank
+	out	(sys1),a
+	ld	a,(watch)	;Read socket to reset
+	ld	hl,pattern	; 64 bit pattern recognition
+	call	outbit		;Output select pattern
+	ld	hl,time
+	call	inbit		;Read the time
+	ld	a,8		;De-select EPROM bank
+	out	(sys1),a
+	ei			;Allow interrupts again
+	ld	sp,(stack)	;Restore stack and
+	ret			; return
+;
+outbit:
+	ld	b,8		;Set up byte count
+loop:	ld	c,8		; and bit count
+	ld	d,(hl)		;Get the byte
+loop1:	xor	a		;Get each bit
+	srl	d		; into the lsb
+	adc	a,0		; of the A register
+	ld	(watch),a	;Send to SmartWatch
+	dec	c
+	jr	nz,loop1	;Next bit
+	inc	hl		;Next byte
+	djnz	loop
+	ret
+;
+inbit:
+	ld	b,8		;Set up byte count
+loop2:	ld	c,8		; and bit count
+loop3:	xor	a		;Read each bit from
+	ld	a,(watch)	; the SmartWatch and
+	srl	a		; shift into memory
+	rr	(hl)
+	dec	c
+	jr	nz,loop3	;Next bit
+	inc	hl		;Next byte
+	djnz	loop2
+	ret
+;
+pattern:
+	defb	0c5h,03ah,0a3h,05ch,0c5h,03ah,0a3h,05ch
+;
+time:
+s100th:	defs	1		; Hundredths of seconds
+secs:	defs	1		; Seconds
+mins:	defs	1		; Minutes
+hours:	defs	1		; Hours
+wday:	defs	1		; Day of week
+day:	defs	1		; Day of month
+month:	defs	1		; Month
+year:	defs	1		; Year
+;
+	defs	32
+stack:
+	defs	2
+;
+	.dephase
+;
+finish:
+	end	begin

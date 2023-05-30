@@ -1,0 +1,119 @@
+const
+  { character constants }
+  CR               = #$0D;
+
+  { cp/m bdos and bios functions }
+
+  cpm_get_version  = 12;
+  cpm_resetdisk    = 13;
+  cpm_seldsk       = 14;
+  cpm_findfirst    = 17;
+  cpm_findnext     = 18;
+  cpm_setdma       = 26;
+  cpm_setuser      = 32;
+  cpm_call_bios    = 50;
+  cpm_date_time    = 105;
+  cpm_FCB          = $0080;
+  bios_seldsk      = 9;
+  bios_settrk      = 10;
+  bios_setsec      = 11;
+  bios_setdma      = 12;
+  bios_read        = 13;
+  bios_write       = 14;
+
+  msdos_disk_select= 2;  { drive C: }
+
+  { msdos 1.2 Mbyte disk constants }
+  reserved_track   = 0;  { reserved track 0 }
+  boot_sector      = 0;  { 512 byte boot sector }
+  fat_size         = 7;  { sectors in FAT }
+  fat1_start       = 1;  { first copy of FAT }
+  fat1_end         = 7;
+  fat_byte_size    = 3584; { size of FAT table in bytes }
+  dir_track        = 1;  { directory track }
+  dir_start        = 0;  { directory starting sector }
+  dir_end          = 13;
+  dir_number_of_entries
+                   = $E0;
+  sector_size      = 512;
+  sectors_per_track= 15;
+  cluster_size     = 1;
+  data_area_start  = 29; { logical sector number of start of data }
+  media_type       = $F9;{ 1.2 Mbyte AT format disk }
+
+  { msdos_dir file status values }
+  dir_unused       = $00;
+  dir_E5           = $05;
+  dir_directory    = $2E;
+  dir_erased       = $E5;
+
+  { msdos_dir file attributes }
+  dir_ReadOnly     = $01;
+  dir_Hidden       = $02;
+  dir_System       = $04;
+  dir_VolumeLabel  = $08;
+  dir_Subdirectory = $10;
+  dir_Archive      = $20;
+
+type
+  str5             = string[5];
+  str9             = string[9];
+  str12            = string[12];
+  str14            = string[14];
+  str80            = string[80];
+
+  bios_parameter_block =
+    record
+      fn           : byte;
+      a            : byte;
+      bc           : integer;
+      de           : integer;
+      hl           : integer
+    end;
+
+  msdos_dir_entry =
+    record
+      filename     : array [1..8] of byte;
+      extension    : array [1..3] of byte;
+      attribute    : byte;
+      reserved     : array [1..10] of byte;
+      creation_time: integer;
+      creation_date: integer;
+      start_cluster: integer;
+      filesize_lo  : integer;
+      filesize_hi  : integer
+    end;
+
+  msdos_sector = array [1..sector_size] of byte;
+
+  file_allocation_table =
+    record
+      case integer of
+        0: (sectors: array [fat1_start..fat1_end] of msdos_sector);
+        1: (bytes  : array [1..fat_byte_size] of byte);
+    end;
+
+  directory =
+    record
+      case integer of
+        0: (sectors: array [dir_start..dir_end] of msdos_sector);
+        1: (entries: array [1..dir_number_of_entries] of msdos_dir_entry);
+    end;
+
+  FileBlock =
+    record
+      drive        : byte;
+      fname        : array [1..11] of byte;
+      extent,
+      s1, s2, reccount: byte;
+      map          : array [16..31] of byte
+    end;
+
+  FilePtr = ^FileRecord;
+  FileRecord =
+    record
+      fname        : Str12;
+      fsize        : integer;
+      next         : FilePtr
+    end;
+

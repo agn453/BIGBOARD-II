@@ -1,0 +1,100 @@
+;
+; S M A R T W A T . M A C
+;
+;  Routines to read and set the date and time
+;  on the DS1216 SmartWatch plugged into the
+;  U81 socket on the Bigboard II
+;
+;
+WATCH	equ	47FFh		; SmartWatch address
+SYS1	equ	0C8h		; Memory bank select port
+;
+	aseg
+	org	0100h
+;
+	.z80
+begin::
+	ld	hl,start	; Move program above bank
+	ld	de,08000H	;  boundary
+	ld	bc,finish-start
+	ldir
+	rst	38h
+start::
+;
+	.phase 08000H
+;
+setclk::
+	ld	(stack),sp	;Save stack pointer
+	ld	sp,stack	;Use local stack
+	di			;No interruptions
+	ld	a,0		;Select EPROM bank
+	out	(sys1),a
+	ld	a,(watch)	;Read socket to reset
+	ld	hl,pattern	; 64 bit pattern recognition
+	call	outbit		;Output select pattern
+	ld	hl,time
+	call	outbit		;Output the time
+	ld	a,8		;De-select EPROM bank
+	out	(sys1),a
+	ei			;Allow interrupts again
+	ld	sp,(stack)	;Restore stack and
+	ret			; return
+;
+rdclk::
+	ld	(stack),sp	;Save stack pointer
+	ld	sp,stack	;Use local stack
+	di			;No interruptions
+	ld	a,0		;Select EPROM bank
+	out	(sys1),a
+	ld	a,(watch)	;Read socket to reset
+	ld	hl,pattern	; 64 bit pattern recognition
+	call	outbit		;Output select pattern
+	ld	hl,time
+	call	inbit		;Read the time
+	ld	a,8		;De-select EPROM bank
+	out	(sys1),a
+	ei			;Allow interrupts again
+	ld	sp,(stack)	;Restore stack and
+	ret			; return
+;
+outbit::
+	ld	b,8		;Set up byte count
+loop:	ld	c,8		; and bit count
+	ld	d,(hl)		;Get the byte
+loop1:	xor	a		;Get each bit
+	srl	d		; into the lsb
+	adc	a,0		; of the A register
+	ld	(watch),a	;Send to SmartWatch
+	dec	c
+	jr	nz,loop1	;Next bit
+	inc	hl		;Next byte
+	djnz	loop
+	ret
+;
+inbit::
+	ld	b,8		;Set up byte count
+loop2:	ld	c,8		; and bit count
+loop3:	xor	a		;Read each bit from
+	ld	a,(watch)	; the SmartWatch and
+	srl	a		; shift into memory
+	rr	(hl)
+	dec	c
+	jr	nz,loop3	;Next bit
+	inc	hl		;Next byte
+	djnz	loop2
+	ret
+;
+pattern::
+	defb	0c5h,03ah,0a3h,05ch,0c5h,03ah,0a3h,05ch
+;
+time::
+	defs	8
+;
+	defs	32
+stack::
+	defs	2
+;
+	.dephase
+;
+finish::
+	end	begin

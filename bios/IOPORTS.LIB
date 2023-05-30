@@ -1,0 +1,38 @@
+;
+; IOPORTS.LIB  -  HARDWARE I/O PORT EQUATES FOR BIGBOARD II
+;
+
+;
+; Z80 SIOs
+;
+SIO0	EQU	80h		;Serial port 0
+SIO1	EQU	82h		;Serial port 1
+
+SIODAT	EQU	0		;Serial data port offset
+SIOSTS	EQU	1		;Serial status port offset
+SIOTBE	EQU	4		;Transmit buffer empty bit
+SIODAV	EQU	1		;Data available bit
+
+;
+; Z80 CTC
+;
+CTCA	EQU	88H		;Clock timer port A
+CTCB	EQU	89H		;Clock timer port B
+CTCC	EQU	8AH		;Clock timer port C
+CTCD	EQU	8BH		;Clock timer port D
+
+;
+; Centronics Output port
+;
+GENPIO	EQU	0D8H
+
+;
+; Memory bank select
+;
+SYS1	EQU	0C8H
+
+DMA	EQU	08CH		;Z80 DMA PORT ADDRESS
+SELMUX	EQU	0CCH		;DRIVE SEL/READY MUX CONTROL PORT
+
+SASI	EQU	0D8H		;SASI BUS BASE ADDRESS
+SASIST	EQU	SASI+1

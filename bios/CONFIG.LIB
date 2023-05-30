@@ -1,0 +1,27 @@
+;	+-----------------------+
+;	|			|
+;	|  C O N F I G . L I B	|
+;	|			|
+;	+-----------------------+
+
+true		equ	-1
+false		equ	not true
+
+version	macro
+	db	'04Dec87'
+	endm
+
+banked		equ	false	; TRUE for Banked memory
+
+ldrbios		equ	false	; TRUE for Loader BIOS
+char$io		equ	false	; TRUE to use CHARIO module
+serial$status	equ	false	; TRUE for SIO status interrupt monitoring
+double$sided	equ	true	; TRUE for double sided floppy disk support
+ibm$at		equ	false	; TRUE for IBM-PC/AT 1.2 Mbyte support
+hard$disk 	equ	true	; TRUE for hard disk support
+	st506	equ	false	; TRUE for 5 Mbyte ST506 hard drive
+	tm503	equ	false	; TRUE for 15 Mbyte Seagate TM503 hard drive
+	ms3425	equ	true	; TRUE for 20 Mbyte Miniscribe 3425 hard drive
+hard$init 	equ	true	; TRUE for cold boot init code on hard disk
+ccp$in$rom 	equ	true	; TRUE for CCP.COM in 2732 eprom U80
+skew$dd		equ	true	; TRUE to enable software skew on 1024/8
